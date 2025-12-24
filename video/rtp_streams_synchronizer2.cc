@@ -42,12 +42,23 @@ RtpStreamsSynchronizer::RtpStreamsSynchronizer(TaskQueueBase* main_queue,
     : task_queue_(main_queue),
       syncable_video_(syncable_video),
       last_stats_log_ms_(rtc::TimeMillis()) {
+  RTC_LOG(LS_WARNING) << "RtpStreamsSynchronizer: main_queue=" << main_queue
+                      << ", syncable_video=" << syncable_video;
+  if (!main_queue) {
+    RTC_LOG(LS_ERROR) << "RtpStreamsSynchronizer created with NULL main_queue!";
+    // Add null check to prevent crash -但這只是暫時的診斷措施
+  }
   RTC_DCHECK(syncable_video);
 }
 
 RtpStreamsSynchronizer::~RtpStreamsSynchronizer() {
   RTC_DCHECK_RUN_ON(&main_checker_);
-  repeating_task_.Stop();
+  if (task_queue_) {
+    repeating_task_.Stop();
+  } else {
+    RTC_LOG(LS_WARNING) << "~RtpStreamsSynchronizer: task_queue_ is NULL, "
+                        << "skipping repeating_task_.Stop()";
+  }
 }
 
 void RtpStreamsSynchronizer::ConfigureSync(Syncable* syncable_audio) {
@@ -56,6 +67,14 @@ void RtpStreamsSynchronizer::ConfigureSync(Syncable* syncable_audio) {
   // Prevent expensive no-ops.
   if (syncable_audio == syncable_audio_)
     return;
+
+  // CRITICAL FIX: If task_queue_ is NULL, we cannot start the repeating task
+  if (!task_queue_) {
+    RTC_LOG(LS_ERROR) << "ConfigureSync called but task_queue_ is NULL! "
+                      << "Cannot start synchronization. This means Call was "
+                      << "created on a thread not registered with WebRTC.";
+    return;
+  }
 
   syncable_audio_ = syncable_audio;
   sync_.reset(nullptr);

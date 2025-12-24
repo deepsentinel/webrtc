@@ -174,7 +174,7 @@ class AndroidVideoDecoder implements VideoDecoder, VideoSink {
       return VideoCodecStatus.FALLBACK_SOFTWARE;
     }
     try {
-      MediaFormat format = MediaFormat.createVideoFormat(codecType.mimeType(), width, height);
+      MediaFormat format = createMediaFormat(width, height);
       if (sharedContext == null) {
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
       }
@@ -335,13 +335,21 @@ class AndroidVideoDecoder implements VideoDecoder, VideoSink {
     return VideoCodecStatus.OK;
   }
 
-  private VideoCodecStatus reinitDecode(int newWidth, int newHeight) {
+  protected VideoCodecStatus reinitDecode(int newWidth, int newHeight) {
     decoderThreadChecker.checkIsOnValidThread();
     VideoCodecStatus status = releaseInternal();
     if (status != VideoCodecStatus.OK) {
       return status;
     }
     return initDecodeInternal(newWidth, newHeight);
+  }
+
+  /**
+   * Create MediaFormat for configuring the MediaCodec decoder.
+   * Subclasses can override this to provide codec-specific configuration.
+   */
+  protected MediaFormat createMediaFormat(int width, int height) {
+    return MediaFormat.createVideoFormat(codecType.mimeType(), width, height);
   }
 
   private Thread createOutputThread() {

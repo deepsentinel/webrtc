@@ -398,6 +398,7 @@ if (is_android) {
       "api/org/webrtc/HardwareVideoEncoderFactory.java",
       "api/org/webrtc/PlatformSoftwareVideoDecoderFactory.java",
       "src/java/org/webrtc/AndroidVideoDecoder.java",
+      "src/java/org/webrtc/AndroidVideoDecoderH265.java",
       "src/java/org/webrtc/BaseBitrateAdjuster.java",
       "src/java/org/webrtc/BitrateAdjuster.java",
       "src/java/org/webrtc/DynamicBitrateAdjuster.java",

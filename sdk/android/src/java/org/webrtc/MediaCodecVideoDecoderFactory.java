@@ -47,20 +47,36 @@ class MediaCodecVideoDecoderFactory implements VideoDecoderFactory {
   @Override
   public VideoDecoder createDecoder(VideoCodecInfo codecType) {
     VideoCodecMimeType type = VideoCodecMimeType.valueOf(codecType.getName());
+    Logging.d(TAG, "createDecoder for codec: " + type);
+
     MediaCodecInfo info = findCodecForType(type);
 
     if (info == null) {
+      Logging.e(TAG, "No MediaCodec found for " + type);
       return null;
     }
 
+    Logging.d(TAG, "Found MediaCodec: " + info.getName() + " for " + type);
+
     CodecCapabilities capabilities = info.getCapabilitiesForType(type.mimeType());
+    int colorFormat = MediaCodecUtils.selectColorFormat(MediaCodecUtils.DECODER_COLOR_FORMATS, capabilities);
+
+    Logging.d(TAG, "Selected color format: " + colorFormat + " for " + type);
+
+    // Use specialized AndroidVideoDecoderH265 for H.265 to handle parameter sets
+    if (type == VideoCodecMimeType.H265) {
+      return new AndroidVideoDecoderH265(new MediaCodecWrapperFactoryImpl(), info.getName(), type,
+          colorFormat, sharedContext, codecType.params);
+    }
+
+    // Use generic AndroidVideoDecoder for other codecs
     return new AndroidVideoDecoder(new MediaCodecWrapperFactoryImpl(), info.getName(), type,
-        MediaCodecUtils.selectColorFormat(MediaCodecUtils.DECODER_COLOR_FORMATS, capabilities),
-        sharedContext);
+        colorFormat, sharedContext);
   }
 
   @Override
   public VideoCodecInfo[] getSupportedCodecs() {
+    Logging.d(TAG, "getSupportedCodecs called");
     List<VideoCodecInfo> supportedCodecInfos = new ArrayList<VideoCodecInfo>();
     // Generate a list of supported codecs in order of preference:
     // VP8, VP9, H264 (high profile), H264 (baseline profile), AV1 and H265.
@@ -69,6 +85,7 @@ class MediaCodecVideoDecoderFactory implements VideoDecoderFactory {
             VideoCodecMimeType.H264, VideoCodecMimeType.AV1, VideoCodecMimeType.H265}) {
       MediaCodecInfo codec = findCodecForType(type);
       if (codec != null) {
+        Logging.d(TAG, "Found codec support for: " + type.name());
         String name = type.name();
         if (type == VideoCodecMimeType.H264 && isH264HighProfileSupported(codec)) {
           supportedCodecInfos.add(new VideoCodecInfo(
@@ -77,6 +94,8 @@ class MediaCodecVideoDecoderFactory implements VideoDecoderFactory {
 
         supportedCodecInfos.add(new VideoCodecInfo(
             name, MediaCodecUtils.getCodecProperties(type, /* highProfile= */ false)));
+      } else {
+        Logging.d(TAG, "No codec support for: " + type.name());
       }
     }
 
