@@ -39,6 +39,7 @@
 #include "modules/rtp_rtcp/source/video_rtp_depacketizer_raw.h"
 #include "modules/video_coding/h264_sprop_parameter_sets.h"
 #include "modules/video_coding/h264_sps_pps_tracker.h"
+#include "modules/video_coding/h26x_packet_buffer.h"
 #include "modules/video_coding/nack_requester.h"
 #include "modules/video_coding/packet_buffer.h"
 #include "rtc_base/checks.h"
@@ -296,6 +297,11 @@ RtpVideoStreamReceiver2::RtpVideoStreamReceiver2(
       frames_decryptable_(false),
       absolute_capture_time_interpolator_(clock) {
   packet_sequence_checker_.Detach();
+
+  // Initialize H26xPacketBuffer for H.264/H.265 support
+  h26x_packet_buffer_ = std::make_unique<H26xPacketBuffer>(
+      /*h264_idr_only_keyframes_allowed=*/false);
+
   if (packet_router_) {
     // Do not register as REMB candidate, this is only done when starting to
     // receive.
@@ -668,7 +674,8 @@ bool RtpVideoStreamReceiver2::OnReceivedPayloadData(
     return false;
   }
 
-  if (packet->codec() == kVideoCodecH264) {
+  if (packet->codec() == kVideoCodecH264 &&
+      !UseH26xPacketBuffer(packet->codec())) {
     // Only when we start to receive packets will we know what payload type
     // that will be used. When we know the payload type insert the correct
     // sps/pps into the tracker.
@@ -700,7 +707,12 @@ bool RtpVideoStreamReceiver2::OnReceivedPayloadData(
 
   rtcp_feedback_buffer_.SendBufferedRtcpFeedback();
   frame_counter_.Add(packet->timestamp);
-  OnInsertedPacket(packet_buffer_.InsertPacket(std::move(packet)));
+
+  if (h26x_packet_buffer_ && UseH26xPacketBuffer(packet->codec())) {
+    OnInsertedPacket(h26x_packet_buffer_->InsertPacket(std::move(packet)));
+  } else {
+    OnInsertedPacket(packet_buffer_.InsertPacket(std::move(packet)));
+  }
   return false;
 }
 
@@ -1298,6 +1310,18 @@ void RtpVideoStreamReceiver2::InsertSpsPpsIntoTracker(uint8_t payload_type) {
 
   tracker_.InsertSpsPpsNalus(sprop_decoder.sps_nalu(),
                              sprop_decoder.pps_nalu());
+}
+
+bool RtpVideoStreamReceiver2::UseH26xPacketBuffer(
+    std::optional<VideoCodecType> codec) const {
+  RTC_DCHECK_RUN_ON(&packet_sequence_checker_);
+  if (codec == kVideoCodecH265) {
+    return true;
+  }
+  if (codec == kVideoCodecH264) {
+    return field_trials_.IsEnabled("WebRTC-Video-H26xPacketBuffer");
+  }
+  return false;
 }
 
 void RtpVideoStreamReceiver2::UpdatePacketReceiveTimestamps(
