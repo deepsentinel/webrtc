@@ -13,6 +13,7 @@
 #import "RTCMacros.h"
 
 RTC_OBJC_EXPORT extern NSString *const kRTCVideoCodecH264Name;
+RTC_OBJC_EXPORT extern NSString *const kRTCVideoCodecH265Name;
 RTC_OBJC_EXPORT extern NSString *const kRTCLevel31ConstrainedHigh;
 RTC_OBJC_EXPORT extern NSString *const kRTCLevel31ConstrainedBaseline;
 RTC_OBJC_EXPORT extern NSString *const kRTCMaxSupportedH264ProfileLevelConstrainedHigh;

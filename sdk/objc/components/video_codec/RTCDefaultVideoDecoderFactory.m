@@ -12,6 +12,7 @@
 
 #import "RTCH264ProfileLevelId.h"
 #import "RTCVideoDecoderH264.h"
+#import "RTCVideoDecoderH265.h"
 #import "api/video_codec/RTCVideoCodecConstants.h"
 #import "api/video_codec/RTCVideoDecoderVP8.h"
 #import "api/video_codec/RTCVideoDecoderVP9.h"
@@ -45,9 +46,15 @@
   RTC_OBJC_TYPE(RTCVideoCodecInfo) *vp8Info =
       [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:kRTCVideoCodecVp8Name];
 
+  // H.265 with empty parameters to accept any profile/level from camera
+  // This is more flexible and will match offers with various parameter formats
+  RTC_OBJC_TYPE(RTCVideoCodecInfo) *h265Info =
+      [[RTC_OBJC_TYPE(RTCVideoCodecInfo) alloc] initWithName:kRTCVideoCodecH265Name];
+
   NSMutableArray<RTC_OBJC_TYPE(RTCVideoCodecInfo) *> *result = [@[
     constrainedHighInfo,
     constrainedBaselineInfo,
+    h265Info,
     vp8Info,
   ] mutableCopy];
 
@@ -66,6 +73,8 @@
 - (id<RTC_OBJC_TYPE(RTCVideoDecoder)>)createDecoder:(RTC_OBJC_TYPE(RTCVideoCodecInfo) *)info {
   if ([info.name isEqualToString:kRTCVideoCodecH264Name]) {
     return [[RTC_OBJC_TYPE(RTCVideoDecoderH264) alloc] init];
+  } else if ([info.name isEqualToString:kRTCVideoCodecH265Name]) {
+    return [[RTC_OBJC_TYPE(RTCVideoDecoderH265) alloc] initWithCodecInfo:info];
   } else if ([info.name isEqualToString:kRTCVideoCodecVp8Name]) {
     return [RTC_OBJC_TYPE(RTCVideoDecoderVP8) vp8Decoder];
   } else if ([info.name isEqualToString:kRTCVideoCodecVp9Name] &&

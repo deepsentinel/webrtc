@@ -1293,8 +1293,10 @@ if (is_ios || is_mac) {
           "objc/components/video_codec/RTCH264ProfileLevelId.h",
           "objc/components/video_codec/RTCVideoDecoderFactoryH264.h",
           "objc/components/video_codec/RTCVideoDecoderH264.h",
+          "objc/components/video_codec/RTCVideoDecoderH265.h",
           "objc/components/video_codec/RTCVideoEncoderFactoryH264.h",
           "objc/components/video_codec/RTCVideoEncoderH264.h",
+          "objc/components/video_codec/RTCVideoEncoderH265.h",
           "objc/components/video_frame_buffer/RTCCVPixelBuffer.h",
           "objc/helpers/RTCCameraPreviewView.h",
           "objc/helpers/RTCDispatcher.h",
@@ -1490,8 +1492,10 @@ if (is_ios || is_mac) {
           "objc/components/video_codec/RTCH264ProfileLevelId.h",
           "objc/components/video_codec/RTCVideoDecoderFactoryH264.h",
           "objc/components/video_codec/RTCVideoDecoderH264.h",
+          "objc/components/video_codec/RTCVideoDecoderH265.h",
           "objc/components/video_codec/RTCVideoEncoderFactoryH264.h",
           "objc/components/video_codec/RTCVideoEncoderH264.h",
+          "objc/components/video_codec/RTCVideoEncoderH265.h",
           "objc/components/video_frame_buffer/RTCCVPixelBuffer.h",
           "objc/helpers/RTCDispatcher.h",
         ]
@@ -1710,10 +1714,14 @@ if (is_ios || is_mac) {
         "objc/components/video_codec/RTCVideoDecoderFactoryH264.m",
         "objc/components/video_codec/RTCVideoDecoderH264.h",
         "objc/components/video_codec/RTCVideoDecoderH264.mm",
+        "objc/components/video_codec/RTCVideoDecoderH265.h",
+        "objc/components/video_codec/RTCVideoDecoderH265.mm",
         "objc/components/video_codec/RTCVideoEncoderFactoryH264.h",
         "objc/components/video_codec/RTCVideoEncoderFactoryH264.m",
         "objc/components/video_codec/RTCVideoEncoderH264.h",
         "objc/components/video_codec/RTCVideoEncoderH264.mm",
+        "objc/components/video_codec/RTCVideoEncoderH265.h",
+        "objc/components/video_codec/RTCVideoEncoderH265.mm",
       ]
 
       configs += [
