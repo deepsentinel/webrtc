@@ -53,7 +53,6 @@ bool H265AnnexBBufferToCMSampleBuffer(const uint8_t* annexb_buffer,
   *out_sample_buffer = nullptr;
 
   // Get NAL unit indices
-  webrtc::H265::NaluIndex nalu_indices[annexb_buffer_size];
   std::vector<webrtc::H265::NaluIndex> indices =
       webrtc::H265::FindNaluIndices(annexb_buffer, annexb_buffer_size);
 
