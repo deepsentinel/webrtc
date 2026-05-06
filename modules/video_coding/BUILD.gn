@@ -451,6 +451,51 @@ rtc_library("webrtc_h264") {
   }
 }
 
+# Software HEVC decoder backed by FFmpeg. Decoder-only — there is no x265
+# encoder dependency, no patent encumbrance for the encode path. Active when
+# rtc_use_h265 (cascades from enable_hevc_parser_and_hw_decoder under
+# build_with_chromium). Sources still compile under the RTC_ENABLE_H265
+# preprocessor gate, so the target itself is unconditional.
+rtc_library("webrtc_h265") {
+  visibility = [ "*" ]
+  sources = [
+    "codecs/h265/h265.cc",
+    "codecs/h265/h265_color_space.cc",
+    "codecs/h265/h265_color_space.h",
+    "codecs/h265/h265_decoder_impl.cc",
+    "codecs/h265/h265_decoder_impl.h",
+    "codecs/h265/include/h265.h",
+  ]
+
+  defines = []
+  deps = [
+    ":video_codec_interface",
+    ":video_coding_utility",
+    "../../api:scoped_refptr",
+    "../../api/video:encoded_image",
+    "../../api/video:render_resolution",
+    "../../api/video:video_frame",
+    "../../api/video:video_frame_i010",
+    "../../api/video:video_rtp_headers",
+    "../../api/video_codecs:video_codecs_api",
+    "../../common_video",
+    "../../media:media_constants",
+    "../../rtc_base:checks",
+    "../../rtc_base:event_tracer",
+    "../../rtc_base:logging",
+    "../../rtc_base/system:rtc_export",
+    "../../system_wrappers:metrics",
+    "//third_party/abseil-cpp/absl/strings",
+  ]
+
+  if (rtc_use_h265) {
+    deps += [ "//third_party/ffmpeg" ]
+    if (!build_with_mozilla) {
+      deps += [ "../../media:rtc_media_base" ]
+    }
+  }
+}
+
 # This target defines a bare-bones interface towards libvpx, used by the
 # VP8 and VP9 wrappers below.
 rtc_library("webrtc_libvpx_interface") {
