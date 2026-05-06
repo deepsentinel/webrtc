@@ -36,6 +36,7 @@ chromium-patches/
   scripts/
     apply.sh                apply all patches in order
     build.sh                gn gen + autoninja chrome
+    package.sh              build a portable redistributable zip
   docs/
     design.md               architecture and rationale
 ```
@@ -134,6 +135,37 @@ against a production peer; in `chrome://webrtc-internals` look for:
 - `inbound-rtp.decoderImplementation` = `"FFmpeg"`
 - `inbound-rtp.powerEfficientDecoder` = `false`
 - `inbound-rtp.framesDecoded` increasing
+
+## Distribution to other workstations
+
+For internal deployment to GPU-less Windows targets, run `package.sh`
+after a successful build to produce a portable, runtime-only zip:
+
+```bash
+bash third_party/webrtc/chromium-patches/scripts/package.sh
+# output: ./dist/chrome-hevc-portable-149.0.7826.0.zip   (~400 MB)
+```
+
+The recipient unzips the archive and double-clicks `chrome.exe` — no
+installer, no registry, no admin rights. SmartScreen will warn on first
+run because the binary is unsigned (click "More info → Run anyway").
+
+To bundle Visual C++ runtime DLLs into the zip so recipients don't need
+to install the redistributable separately, set `VC_REDIST_DIR` first:
+
+```bash
+VC_REDIST_DIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Redist\\MSVC\\14.36.32532\\x64\\Microsoft.VC143.CRT" \
+  bash third_party/webrtc/chromium-patches/scripts/package.sh
+```
+
+(Adjust the version number under `MSVC\` to whatever's installed on the
+build machine.) `LOCALE=all` ships every locale; default is `en-US` only,
+which saves ~120 MB.
+
+The script generates a `README.txt` and `NOTICES.txt` inside the zip
+covering launch instructions, the SmartScreen warning, and licensing /
+HEVC patent attribution. **For internal use only — do not redistribute
+outside the company without legal review of HEVC patent obligations.**
 
 ## Maintenance / rebasing on a new Chromium milestone
 
