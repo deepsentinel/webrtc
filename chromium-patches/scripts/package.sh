@@ -60,13 +60,24 @@ mkdir -p "$STAGE"
 # deliberately excluded -- they're 400+ MB combined and never run on the
 # target machine.
 echo "==> copying executables"
-for exe in chrome.exe elevation_service.exe elevated_tracing_service.exe; do
+# chrome_proxy.exe is the launcher Chrome registers as the user-facing entry
+# point; chrome_pwa_launcher.exe is invoked when launching installed PWAs;
+# notification_helper.exe handles toast notifications. All three are
+# referenced by chrome.exe at runtime, so omit them at your peril.
+for exe in chrome.exe chrome_proxy.exe chrome_pwa_launcher.exe \
+           elevation_service.exe elevated_tracing_service.exe \
+           notification_helper.exe; do
   if [[ -f "$OUT_DIR/$exe" ]]; then
     cp "$OUT_DIR/$exe" "$STAGE/"
   fi
 done
-# Include manifests for the executables.
+# Include the .exe.manifest files (none are emitted on most builds because
+# manifests are linked-in, but copy any that exist) AND the version-named
+# Side-by-Side assembly manifest (e.g. 149.0.7826.0.manifest) which chrome.exe
+# resolves at startup. Without it Windows refuses to launch with
+# "side-by-side configuration is incorrect".
 cp "$OUT_DIR"/*.exe.manifest "$STAGE/" 2>/dev/null || true
+cp "$OUT_DIR"/*.manifest "$STAGE/" 2>/dev/null || true
 
 echo "==> copying runtime DLLs (skipping debug/validation layers)"
 for dll in "$OUT_DIR"/*.dll; do
@@ -87,6 +98,20 @@ if [[ -d "$OUT_DIR/swiftshader" ]]; then
   echo "==> copying swiftshader (SW GPU fallback for GPU-less hosts)"
   cp -r "$OUT_DIR/swiftshader" "$STAGE/"
 fi
+
+# Runtime data subdirectories. Chrome looks up these paths relative to its
+# executable for various features. Missing them doesn't crash the browser
+# but causes degraded behaviour (no media-engagement preload, no privacy
+# sandbox attestations, no ANGLE shader cache, etc.). Build-internal
+# directories (gen/, obj/, jsproto/, pyproto/, initialexe/, the toolchain
+# trees) are deliberately excluded.
+echo "==> copying runtime data subdirectories"
+for d in MEIPreload PrivacySandboxAttestationsPreloaded angledata \
+         hyphen-data resources IwaKeyDistribution; do
+  if [[ -d "$OUT_DIR/$d" ]]; then
+    cp -r "$OUT_DIR/$d" "$STAGE/" && echo "  + $d/"
+  fi
+done
 
 echo "==> copying locales (LOCALE=$LOCALE)"
 mkdir -p "$STAGE/locales"
