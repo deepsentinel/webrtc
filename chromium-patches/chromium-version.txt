@@ -1,0 +1,6 @@
+chromium=149.0.7826.0
+chromium-commit=a7aa922305e72e5ec50e3decf4eedced06e9f47c
+webrtc-base=df1d02d83f
+webrtc-fork=https://github.com/deepsentinel/webrtc.git
+webrtc-fork-branch=deepsentinel/m149-sw-hevc-decoder
+ffmpeg-commit=88d556ed644174bed95a02949d633b9748120fb4

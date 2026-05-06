@@ -1,0 +1,176 @@
+# chromium-patches
+
+Chromium-side prerequisites and build tooling for the software HEVC decoder
+that lives on this branch (`deepsentinel/m149-sw-hevc-decoder`).
+
+The WebRTC code changes (the `H265DecoderImpl` and the `InternalDecoderFactory`
+wiring) are at the root of this repo, in their normal WebRTC paths. The files
+in this `chromium-patches/` directory are everything *outside* WebRTC that you
+also need to build and run a Chromium with software HEVC WebRTC decode.
+
+End-to-end verified on Chrome M149 against a production sender (720x576,
+25fps, ~500 kbps): `decoderImplementation: "FFmpeg"`,
+`powerEfficientDecoder: false`, zero ongoing frame drops.
+
+## Why decoder-only
+
+x265 is GPL and HEVC encode is patent-encumbered. We never need to encode in
+this use case (the receiver is the only side we control), so the fork adds no
+encoder. The decoder side is FFmpeg, which Chromium already builds and which
+is licensed compatibly when paired with `ffmpeg_branding = "Chrome"`.
+
+## Layout
+
+```
+chromium-patches/
+  README.md                 (you are here)
+  chromium-version.txt      exact commit pins
+  patches/
+    chromium/               patches against chromium/src
+      0001-stazhu-enable-hevc-in-ffmpeg-pipeline.patch
+      0002-rtc-video-decoder-adapter-allow-hevc-software-fallback.patch
+    ffmpeg/                 patches against third_party/ffmpeg
+      0001-stazhu-add-hevc-decoder-and-parser.patch
+  config/
+    args.gn                 GN args used to build
+  scripts/
+    apply.sh                apply all patches in order
+    build.sh                gn gen + autoninja chrome
+  docs/
+    design.md               architecture and rationale
+```
+
+## Attribution
+
+The `stazhu-` patches are derived from
+[StaZhu/enable-chromium-hevc-hardware-decoding](https://github.com/StaZhu/enable-chromium-hevc-hardware-decoding)
+which enables HEVC in Chromium's `<video>`/MSE FFmpeg path. They are a
+prerequisite — without them, the FFmpeg HEVC decoder symbols aren't compiled
+in. Re-snapshotted here against Chromium M149 with one drift fix
+(`IsDecoderColorSpaceSupported` was renamed to `IsColorSpaceSupported`
+upstream).
+
+The `rtc-video-decoder-adapter-allow-hevc-software-fallback` patch and all
+WebRTC-side changes (the H.265 decoder code at the repo root) are local work.
+
+## Prerequisites
+
+- Chromium source synced to the commit in `chromium-version.txt`
+- `depot_tools` in PATH
+- Windows: VS Build Tools 2022 (17.14+), Windows SDK 26100, Debugging Tools
+  for Windows
+- ~30 GB free on the build drive (slim dev config, no LTO, no symbols)
+
+## Quick start
+
+The intended workflow uses gclient `custom_deps` so that this branch lands at
+`src/third_party/webrtc/` automatically when you sync Chromium. Then the
+scripts at `chromium-patches/scripts/` just work — no env vars needed.
+
+In your `.gclient` file (at the parent of `src/`):
+
+```python
+solutions = [
+  {
+    "name": "src",
+    "url": "https://chromium.googlesource.com/chromium/src.git",
+    "managed": False,
+    "custom_deps": {
+      "src/third_party/webrtc":
+        "https://github.com/deepsentinel/webrtc.git@deepsentinel/m149-sw-hevc-decoder",
+    },
+    "custom_vars": {},
+  },
+]
+```
+
+Then:
+
+```bash
+# 1. Sync Chromium to the pinned commit
+cd /path/to/chromium/src
+git fetch && git checkout $(awk -F= '/^chromium-commit/{print $2}' \
+  third_party/webrtc/chromium-patches/chromium-version.txt)
+gclient sync -D
+
+# 2. Apply patches (auto-detects CHROMIUM_SRC from the script's location)
+bash third_party/webrtc/chromium-patches/scripts/apply.sh
+
+# 3. Build
+bash third_party/webrtc/chromium-patches/scripts/build.sh
+```
+
+If you cloned the webrtc fork separately (e.g. just to read the patches),
+set `CHROMIUM_SRC` explicitly:
+
+```bash
+export CHROMIUM_SRC=/path/to/chromium/src
+bash chromium-patches/scripts/apply.sh
+```
+
+## Verifying the build
+
+After `chrome.exe` builds, launch it with a fresh profile:
+
+```powershell
+chrome.exe --user-data-dir=C:\temp\hevc-test-profile
+```
+
+In DevTools console on `about:blank`:
+
+```js
+const recv = RTCRtpReceiver.getCapabilities('video').codecs;
+console.log('H265 entries:', recv.filter(c => c.mimeType === 'video/H265'));
+```
+
+Expect 2 entries (Main + Main10 at Level 3.1). If empty, the WebRTC fork
+isn't wired in correctly — `apply.sh` will warn at the top if
+`third_party/webrtc` is on the wrong branch.
+
+End-to-end verification needs an actual H.265 RTP sender. Confirmed working
+against a production peer; in `chrome://webrtc-internals` look for:
+
+- `inbound-rtp.codec` = `H265 (...)`
+- `inbound-rtp.decoderImplementation` = `"FFmpeg"`
+- `inbound-rtp.powerEfficientDecoder` = `false`
+- `inbound-rtp.framesDecoded` increasing
+
+## Maintenance / rebasing on a new Chromium milestone
+
+The drift hot-spots, ordered by frequency of change:
+
+1. **`media/base/supported_types.cc`** — function names around HEVC profile
+   support get refactored every few milestones. Last drift:
+   `IsDecoderColorSpaceSupported` → `IsColorSpaceSupported` (M147 era).
+2. **`third_party/ffmpeg` config files** — must be regenerated on every
+   FFmpeg roll. StaZhu maintains updated patches in his repo; cross-check
+   there first.
+3. **`third_party/webrtc/media/engine/internal_decoder_factory.cc`** —
+   touched on every codec addition. Watch for refactor to a registry pattern
+   (would simplify our integration).
+4. **`HasSoftwareFallback()` in `rtc_video_decoder_adapter.cc`** — already
+   on `crbug.com/355256378`; upstream may reorganize.
+
+Recommended canary in the WebRTC code:
+`static_assert(BUILDFLAG(RTC_USE_H265))` at the top of `h265_decoder_impl.cc`.
+
+## When to cut a new milestone
+
+When a new Chromium milestone (M150, M151, ...) becomes interesting:
+
+1. Branch `M{X}-upstream` off the current upstream WebRTC at the commit
+   Chromium pins for that milestone (look in Chromium's `DEPS`).
+2. Cherry-pick the two H.265 commits onto a new
+   `deepsentinel/m{X}-sw-hevc-decoder` branch off `M{X}-upstream`.
+3. Re-export the chromium-side patches against the new milestone:
+   ```bash
+   git -C $CHROMIUM_SRC diff HEAD -- media/ \
+     > chromium-patches/patches/chromium/0001-...patch
+   git -C $CHROMIUM_SRC diff HEAD -- third_party/blink/ \
+     > chromium-patches/patches/chromium/0002-...patch
+   git -C $CHROMIUM_SRC/third_party/ffmpeg diff HEAD \
+     > chromium-patches/patches/ffmpeg/0001-...patch
+   ```
+4. Update `chromium-version.txt` with the new pins.
+5. Add the rebased patches as a third commit on the new milestone branch
+   (matching this branch's pattern).

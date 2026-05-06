@@ -1,0 +1,29 @@
+diff --git a/third_party/blink/renderer/platform/peerconnection/rtc_video_decoder_adapter.cc b/third_party/blink/renderer/platform/peerconnection/rtc_video_decoder_adapter.cc
+index b9e357a441673..36b568189976f 100644
+--- a/third_party/blink/renderer/platform/peerconnection/rtc_video_decoder_adapter.cc
++++ b/third_party/blink/renderer/platform/peerconnection/rtc_video_decoder_adapter.cc
+@@ -31,6 +31,7 @@
+ #include "media/base/platform_features.h"
+ #include "media/base/supported_types.h"
+ #include "media/base/video_decoder.h"
++#include "media/media_buildflags.h"
+ #include "media/base/video_types.h"
+ #include "media/video/gpu_video_accelerator_factories.h"
+ #include "third_party/blink/public/platform/platform.h"
+@@ -94,7 +95,16 @@ void RecordReinitializationLatency(base::TimeDelta latency) {
+ 
+ bool HasSoftwareFallback(media::VideoCodec video_codec) {
+   if (video_codec == media::VideoCodec::kHEVC) {
++#if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER) && \
++    BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
++    // Local fork: webrtc::H265DecoderImpl is registered in
++    // InternalDecoderFactory and provides a pure-software HEVC decode path
++    // backed by FFmpeg. Allow the adapter's software-fallback machinery
++    // (resolution monitor, pending-buffer drain) to engage for HEVC.
++    return true;
++#else
+     return false;
++#endif
+   }
+ // TODO(crbug.com/355256378): OpenH264 for encoding and FFmpeg for H264 decoding
+ // should be detangled such that software decoding can be enabled without

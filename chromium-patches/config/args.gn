@@ -1,0 +1,28 @@
+# Slim development build for HEVC SW decode work.
+# Disk-tight (~25-30 GB out/), no LTO, no debug symbols. NOT for shipping —
+# switch to is_official_build=true + symbol_level=1 for final release builds.
+
+is_debug = false
+is_official_build = false
+is_component_build = false
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+
+# StaZhu's HEVC enablement (matches the patches we just applied)
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
+enable_platform_hevc = true
+enable_hevc_parser_and_hw_decoder = true
+media_use_ffmpeg = true
+
+# WebRTC HEVC build flag — cascades from enable_hevc_parser_and_hw_decoder
+# in webrtc.gni when build_with_chromium, but set explicitly for documentation.
+rtc_use_h265 = true
+
+target_os = "win"
+target_cpu = "x64"
+
+# DCHECKs off in release for speed. Flip to true if you want runtime sanity
+# checks at the cost of build speed and binary size.
+dcheck_always_on = false
