@@ -31,6 +31,10 @@
 #include "modules/video_coding/codecs/av1/dav1d_decoder.h"  // nogncheck
 #endif
 
+#ifdef RTC_ENABLE_H265
+#include "modules/video_coding/codecs/h265/include/h265.h"
+#endif
+
 namespace webrtc {
 namespace {
 #if defined(RTC_DAV1D_IN_INTERNAL_DECODER_FACTORY)
@@ -52,6 +56,11 @@ std::vector<SdpVideoFormat> InternalDecoderFactory::GetSupportedFormats()
     formats.push_back(format);
   for (const SdpVideoFormat& h264_format : SupportedH264DecoderCodecs())
     formats.push_back(h264_format);
+
+#ifdef RTC_ENABLE_H265
+  for (const SdpVideoFormat& h265_format : SupportedH265DecoderCodecs())
+    formats.push_back(h265_format);
+#endif
 
   if (kDav1dIsIncluded) {
     formats.push_back(SdpVideoFormat::AV1Profile0());
@@ -94,6 +103,11 @@ std::unique_ptr<VideoDecoder> InternalDecoderFactory::Create(
     return VP9Decoder::Create();
   if (absl::EqualsIgnoreCase(format.name, kH264CodecName))
     return H264Decoder::Create();
+
+#ifdef RTC_ENABLE_H265
+  if (absl::EqualsIgnoreCase(format.name, kH265CodecName))
+    return H265Decoder::Create();
+#endif
 
   if (absl::EqualsIgnoreCase(format.name, kAv1CodecName) && kDav1dIsIncluded) {
     return CreateDav1dDecoder(env);

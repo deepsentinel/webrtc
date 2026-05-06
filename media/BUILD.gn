@@ -544,6 +544,7 @@ rtc_library("rtc_internal_video_codecs") {
     "../call:call_interfaces",
     "../modules/video_coding:video_codec_interface",
     "../modules/video_coding:webrtc_h264",
+    "../modules/video_coding:webrtc_h265",
     "../modules/video_coding:webrtc_vp8",
     "../modules/video_coding:webrtc_vp9",
     "../rtc_base:checks",
