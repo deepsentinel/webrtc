@@ -37,7 +37,17 @@ cd "$CHROMIUM_SRC"
 echo "==> running gn gen out/Release"
 gn gen out/Release
 
-echo "==> running autoninja -C out/Release chrome"
+# M145's bundled siso predates the -heartbeat_period flag that current
+# depot_tools' autoninja passes, so autoninja crashes immediately. We
+# bypass autoninja+siso and call the bundled ninja.exe directly. This
+# disables remote-execution (siso's main feature) but for an internal
+# fork on a single workstation that's a non-issue.
+NINJA="$CHROMIUM_SRC/third_party/ninja/ninja.exe"
+if [[ ! -x "$NINJA" ]]; then
+  NINJA=ninja
+fi
+
+echo "==> running $NINJA -C out/Release chrome"
 echo "    (this can take 4-6 hours on a 4-core laptop for a clean build,"
 echo "     ~30-60 minutes for a delta build after small patches)"
-autoninja -C out/Release chrome
+"$NINJA" -C out/Release chrome
