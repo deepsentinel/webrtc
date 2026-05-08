@@ -1,0 +1,18 @@
+diff --git a/media/ffmpeg/ffmpeg_common.cc b/media/ffmpeg/ffmpeg_common.cc
+--- a/media/ffmpeg/ffmpeg_common.cc
++++ b/media/ffmpeg/ffmpeg_common.cc
+@@ -39,7 +39,13 @@ namespace media {
+ namespace {
+
+ // TODO(crbug.com/379418979): Remove after M133 is stable.
+-BASE_FEATURE(kStrictFFmpegCodecs, base::FEATURE_ENABLED_BY_DEFAULT);
++// Local fork: defaulted off. Upstream sets AV_EF_EXPLODE so any FFmpeg
++// warning becomes fatal, which kills SW HEVC playback on streams that
++// emit recoverable RPS reconstruction warnings (e.g. 4K HEVC from some
++// encoders). HW decode is unaffected because it bypasses FFmpeg. Our
++// inputs are trusted internal sources, so the security tradeoff doesn't
++// apply. Re-enable with --enable-features=StrictFFmpegCodecs if needed.
++BASE_FEATURE(kStrictFFmpegCodecs, base::FEATURE_DISABLED_BY_DEFAULT);
+
+ EncryptionScheme GetEncryptionScheme(const AVStream* stream) {
+   AVDictionaryEntry* key =

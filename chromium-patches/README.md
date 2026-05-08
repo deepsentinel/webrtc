@@ -32,6 +32,8 @@ chromium-patches/
     chromium/               patches against chromium/src
       0001-stazhu-enable-hevc-in-ffmpeg-pipeline.patch
       0002-rtc-video-decoder-adapter-allow-hevc-software-fallback.patch
+      0003-disable-strict-ffmpeg-codecs-default.patch
+      0004-list-marker-clang-O3-workaround.patch
     ffmpeg/                 patches against third_party/ffmpeg
       0001-stazhu-add-hevc-decoder-and-parser.patch
   config/
@@ -195,6 +197,33 @@ Three M145-specific build adjustments are baked into the ffmpeg patch
    per FFmpeg snapshot and has no functional effect; the meaningful
    `CONFIG_HEVC_DECODER 1` etc. defines are in hunks #2-#4 and apply
    cleanly.
+4. **Clang frontend `-O3` segfault workaround** (patch `0004`) wraps
+   `list_marker.cc` and `unpositioned_list_marker.cc` in
+   `#pragma clang optimize off` plus a `-Wignored-attributes` diag
+   suppress (so `[[clang::always_inline]]` from the WTF strings include
+   chain doesn't fail `-Werror`). Two TUs only — the rest of Blink
+   compiles fine. Without this, the build deterministically crashes the
+   clang frontend on those two files.
+
+## Strict FFmpeg codecs (4K HEVC fix)
+
+`media/ffmpeg/ffmpeg_common.cc` defines a runtime feature
+`kStrictFFmpegCodecs` that, when enabled, sets `AV_EF_EXPLODE` on every
+FFmpeg codec context. That promotes any FFmpeg-internal warning (including
+recoverable RPS reconstruction hiccups that some 4K HEVC encoders emit) to
+a fatal `AVERROR_INVALIDDATA`, killing the pipeline mid-stream. HW decode
+sidesteps this entirely because it goes through D3D11VideoDecoder, not
+FFmpeg.
+
+Upstream defaults this feature **on** (security hardening for untrusted
+inputs — see crbug.com/379418979). Patch `0003` flips the default to
+**off** for our fork because our inputs are trusted internal sources and
+hard pipeline failure on a recoverable warning is worse than the security
+tradeoff. Re-enable per-launch with `--enable-features=StrictFFmpegCodecs`
+if needed.
+
+Symptom this fixes: 4K HEVC `<video>`/MSE playback aborts ~1.5 seconds in
+with `PIPELINE_ERROR_DECODE`, while HW decode of the same file works.
 
 ## Maintenance / rebasing on a new Chromium milestone
 

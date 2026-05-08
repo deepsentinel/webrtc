@@ -1,0 +1,34 @@
+diff --git a/third_party/blink/renderer/core/layout/list/list_marker.cc b/third_party/blink/renderer/core/layout/list/list_marker.cc
+index dd4734954e3ca..ec4407a236e3c 100644
+--- a/third_party/blink/renderer/core/layout/list/list_marker.cc
++++ b/third_party/blink/renderer/core/layout/list/list_marker.cc
+@@ -2,6 +2,12 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++// Workaround for M145 clang frontend crash on heavy template instantiation
++// at -O3. Local fork only; revisit when rebasing.
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wignored-attributes"
++#pragma clang optimize off
++
+ #include "third_party/blink/renderer/core/layout/list/list_marker.h"
+ 
+ #include "third_party/blink/renderer/core/accessibility/ax_object_cache.h"
+diff --git a/third_party/blink/renderer/core/layout/list/unpositioned_list_marker.cc b/third_party/blink/renderer/core/layout/list/unpositioned_list_marker.cc
+index f22409fedbac3..616f777f0be19 100644
+--- a/third_party/blink/renderer/core/layout/list/unpositioned_list_marker.cc
++++ b/third_party/blink/renderer/core/layout/list/unpositioned_list_marker.cc
+@@ -2,6 +2,12 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++// Workaround for M145 clang frontend crash on heavy template instantiation
++// at -O3. Local fork only; revisit when rebasing.
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wignored-attributes"
++#pragma clang optimize off
++
+ #include "third_party/blink/renderer/core/layout/list/unpositioned_list_marker.h"
+ 
+ #include "third_party/blink/renderer/core/layout/box_fragment_builder.h"
