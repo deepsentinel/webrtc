@@ -135,6 +135,21 @@ if [[ -n "$VC_REDIST_DIR" && -d "$VC_REDIST_DIR" ]]; then
   done
 fi
 
+echo "==> generating chrome.bat launcher (portable profile)"
+# Force a profile path next to chrome.exe so this dist never collides with
+# any real Google Chrome install on the same machine. Older Chromium opening
+# a profile a newer Chrome has already migrated will silently abort, which
+# is what was reported on the M145 fork. Always launch via this .bat.
+cat > "$STAGE/chrome.bat" <<'EOF'
+@echo off
+setlocal
+set "DIST_DIR=%~dp0"
+set "PROFILE_DIR=%DIST_DIR%profile"
+if not exist "%PROFILE_DIR%" mkdir "%PROFILE_DIR%"
+start "" "%DIST_DIR%chrome.exe" --user-data-dir="%PROFILE_DIR%" --no-default-browser-check %*
+endlocal
+EOF
+
 echo "==> generating README.txt"
 cat > "$STAGE/README.txt" <<EOF
 Chromium HEVC build (M${CHROME_VER})
@@ -145,11 +160,19 @@ the WebRTC code path. For internal use only -- do not redistribute.
 
 How to run
 ----------
-Double-click chrome.exe.
+Double-click **chrome.bat** (NOT chrome.exe directly).
 
-For a clean test profile that won't touch your real Chrome data, run
-from PowerShell or cmd:
-  chrome.exe --user-data-dir=C:\\temp\\chromium-hevc
+The .bat creates a "profile/" subfolder next to chrome.exe and launches
+chrome.exe with --user-data-dir pointing at it. This keeps the dist
+fully portable and prevents collision with any real Google Chrome
+install: a real Chrome leaves its profile in
+%LOCALAPPDATA%\Google\Chrome\User Data, and if a newer real Chrome has
+ever opened that profile, our older fork will silently abort on launch
+when it tries to read it. The .bat avoids that.
+
+To pass extra flags (e.g. for debugging), append them to the .bat:
+  chrome.bat --enable-logging=stderr --v=1
+The .bat passes %* through.
 
 If Windows SmartScreen warns "Windows protected your PC":
   click "More info" -> "Run anyway".
@@ -239,5 +262,5 @@ echo "    package: $ZIP_PATH"
 echo
 echo "    Recipient steps:"
 echo "      1. Unzip $PACKAGE_NAME.zip"
-echo "      2. Double-click $PACKAGE_NAME\\chrome.exe"
+echo "      2. Double-click $PACKAGE_NAME\\chrome.bat   (NOT chrome.exe)"
 echo "      3. (First run) click 'More info' -> 'Run anyway' on the SmartScreen prompt"
