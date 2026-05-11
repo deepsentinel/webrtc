@@ -42,6 +42,10 @@ chromium-patches/
     apply.sh                apply all patches in order
     build.sh                gn gen + autoninja chrome
     package.sh              build a portable redistributable zip
+  installer/                MSI installer (WiX v3) for SCCM/Intune/GPO
+    DeepSentinelLiveViewer.wxs
+    build-msi.sh            consumes the portable zip → MSI
+    README.md               installer build + deployment notes
   docs/
     design.md               architecture and rationale
 ```
@@ -169,6 +173,31 @@ The script generates a `README.txt` and `NOTICES.txt` inside the zip
 covering launch instructions, the SmartScreen warning, and licensing /
 HEVC patent attribution. **For internal use only — do not redistribute
 outside the company without legal review of HEVC patent obligations.**
+
+### MSI installer (SCCM / Intune / GPO)
+
+For managed deployment, `installer/build-msi.sh` rewraps the portable
+zip as an MSI named `DeepSentinel Live Viewer`. It installs per-machine
+to `C:\Program Files\DeepSentinel\Live Viewer\`, adds a Start Menu
+shortcut that pins `--user-data-dir` to a per-user
+`%LOCALAPPDATA%\DeepSentinel\Live Viewer\User Data` location, blocks
+Omaha-based updates via Google Update policy keys, and writes an
+`HKLM\SOFTWARE\DeepSentinel\Live Viewer\Version` registry value for use
+as an SCCM detection rule.
+
+```bash
+# One-time on the build host: install WiX (elevated PowerShell)
+winget install --id WiXToolset.WiXToolset --version 3.14.1.8722
+
+# Build MSI from the most recent portable zip
+bash third_party/webrtc/chromium-patches/installer/build-msi.sh
+# output: ./dist/DeepSentinel-Live-Viewer-145.0.7632.218.msi  (~140 MB)
+```
+
+See `installer/README.md` for SCCM / Intune / GPO deployment details,
+detection rule recommendations, upgrade behavior, and the caveat about
+the system-wide Google Update policy keys (they will also block real
+Google Chrome from updating on the same workstation).
 
 ## M145 rollback notes
 

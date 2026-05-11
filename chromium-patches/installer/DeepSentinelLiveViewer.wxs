@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX v3 installer source for DeepSentinel Live Viewer.
+
+  Build via chromium-patches/installer/build-msi.sh, which:
+    1. Extracts the portable zip from package.sh into a staging dir
+    2. Writes live-viewer.bat into the stage so user-data-dir is
+       resolved at runtime (per-user profile on a per-machine install)
+    3. Runs heat.exe to harvest the stage into Harvested.wxs
+    4. Runs candle.exe + light.exe against both .wxs files
+
+  Variables passed in via candle -d:
+    var.StageDir         path to the staged file tree
+    var.ProductVersion   MSI ProductVersion (major.minor.build), e.g.
+                         145.0.7632. MSI caps major and minor at < 256,
+                         which Chromium's build (7632) and patch (218)
+                         do not fit, so we take the first three fields
+                         of the Chromium version and drop the patch.
+                         AllowSameVersionUpgrades is enabled so respins
+                         of the same Chromium build can still upgrade.
+    var.DisplayVersion   full Chromium version string for ARP display,
+                         e.g. 145.0.7632.218
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="DeepSentinel Live Viewer"
+           Language="1033"
+           Version="$(var.ProductVersion)"
+           Manufacturer="DeepSentinel"
+           UpgradeCode="8A1F9E2D-5C4B-4A3F-9E7D-6B8C0A1F2E3D">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Description="DeepSentinel Live Viewer (Chromium HEVC SW decode)"
+             Comments="Internal-only build. Do not redistribute."
+             Manufacturer="DeepSentinel" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                  AllowSameVersionUpgrades="yes" />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- ARP (Add/Remove Programs) presentation. ARPDISPLAYVERSION and
+         ARPINSTALLLOCATION are set via SetProperty rather than static
+         Property because static declarations of these two specifically
+         do not reliably override the registry values written by the
+         WriteRegistryValues standard action — Windows Installer falls
+         back to ProductVersion / empty respectively. SetProperty in the
+         InstallExecuteSequence works. The static-Property form is fine
+         for the other ARP* properties (NoRepair, NoModify, Contact). -->
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPCONTACT" Value="DeepSentinel internal IT" />
+    <SetProperty Id="ARPDISPLAYVERSION"
+                 Value="$(var.DisplayVersion)"
+                 After="CostFinalize"
+                 Sequence="execute" />
+    <SetProperty Id="ARPINSTALLLOCATION"
+                 Value="[INSTALLFOLDER]"
+                 After="CostFinalize"
+                 Sequence="execute" />
+    <Icon Id="ChromeIcon.exe" SourceFile="$(var.StageDir)\chrome.exe" />
+    <Property Id="ARPPRODUCTICON" Value="ChromeIcon.exe" />
+
+    <!-- Layout: C:\Program Files\DeepSentinel\Live Viewer\ -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="DeepSentinelDir" Name="DeepSentinel">
+          <Directory Id="INSTALLFOLDER" Name="Live Viewer" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppStartMenuDir" Name="DeepSentinel" />
+      </Directory>
+    </Directory>
+
+    <!-- Start Menu shortcut. Targets live-viewer.bat (not chrome.exe
+         directly) so %LOCALAPPDATA% expansion happens per-user at
+         launch time, which is what we want on a per-machine install. -->
+    <DirectoryRef Id="AppStartMenuDir">
+      <Component Id="StartMenuShortcutComponent"
+                 Guid="A2B3C4D5-E6F7-4890-A1B2-C3D4E5F60718"
+                 Win64="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="DeepSentinel Live Viewer"
+                  Description="Internal Chromium build with software HEVC decode"
+                  Target="[INSTALLFOLDER]live-viewer.bat"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="ChromeIcon.exe"
+                  IconIndex="0" />
+        <RemoveFolder Id="RemoveAppStartMenuDir"
+                      Directory="AppStartMenuDir"
+                      On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\DeepSentinel\Live Viewer"
+                       Name="installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Belt-and-suspender Google Update policy keys. Our binary does
+         not ship Omaha/GoogleUpdate.exe so it has nothing to phone home
+         with, but if real Google Chrome ever lands on the same host
+         these system-wide policies stop it from trying to update us
+         too. WARNING: these policies also block updates of any real
+         Google Chrome on the machine; on workstations that mix the two,
+         drop UpdatePoliciesComponent from the Feature below. -->
+    <DirectoryRef Id="TARGETDIR">
+      <Component Id="UpdatePoliciesComponent"
+                 Guid="B3C4D5E6-F708-491A-B2C3-D4E5F60718A2"
+                 Win64="yes">
+        <RegistryKey Root="HKLM" Key="Software\Policies\Google\Update">
+          <RegistryValue Name="UpdateDefault" Type="integer" Value="0" KeyPath="yes" />
+          <RegistryValue Name="InstallDefault" Type="integer" Value="0" />
+          <RegistryValue Name="AutoUpdateCheckPeriodMinutes" Type="integer" Value="0" />
+        </RegistryKey>
+      </Component>
+      <Component Id="ProductIdentificationComponent"
+                 Guid="C4D5E6F7-0819-4A2B-C3D4-E5F60718A2B3"
+                 Win64="yes">
+        <RegistryKey Root="HKLM" Key="Software\DeepSentinel\Live Viewer">
+          <RegistryValue Name="Version" Type="string" Value="$(var.DisplayVersion)" KeyPath="yes" />
+          <RegistryValue Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="DeepSentinel Live Viewer" Level="1">
+      <ComponentGroupRef Id="HarvestedFiles" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="UpdatePoliciesComponent" />
+      <ComponentRef Id="ProductIdentificationComponent" />
+    </Feature>
+
+  </Product>
+</Wix>
