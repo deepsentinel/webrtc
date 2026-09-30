@@ -11,13 +11,21 @@ installer just rewraps it.
 
 - Installs to `C:\Program Files\DeepSentinel\Live Viewer\`
 - Adds a Start Menu shortcut at `DeepSentinel\DeepSentinel Live Viewer`
-  that launches `live-viewer.bat`, which:
-  - Resolves `--user-data-dir` to
-    `%LOCALAPPDATA%\DeepSentinel\Live Viewer\User Data` (per-user profile
-    on a per-machine install — different `%LOCALAPPDATA%` per user)
-  - Passes `--no-default-browser-check` and `--disable-component-update`
-  - Forwards any extra args (`%*`) so debug flags can be appended via
-    a copy-edited shortcut
+  that launches `chrome.exe` with:
+  - `--user-data-dir="%LOCALAPPDATA%\DeepSentinel\Live Viewer\User Data"`
+    (per-user profile on a per-machine install — the shell expands
+    `%LOCALAPPDATA%` per user at launch time)
+  - `--no-default-browser-check --disable-component-update`
+  - `--enable-features=SkipRendererCancellationThrottle,RendererCancellationThrottleImprovements
+    --disable-hang-monitor` so LSC's long-lived tabs are not killed as
+    "unresponsive" under a full 5x2 grid
+- Forces software decode (DS-2916) with the machine policy
+  `HKLM\SOFTWARE\Policies\Chromium\HardwareAccelerationModeEnabled = 0`.
+  This is the policy behind Settings > System > "Use graphics
+  acceleration when available": the GPU path (including D3D11 HEVC
+  decode) is off no matter how chrome.exe is launched, and the toggle is
+  greyed out so guards cannot turn it back on. Every H.265 stream
+  therefore goes through the FFmpeg SW decoder this build exists for.
 - Adds an Add/Remove Programs entry with the full Chromium version
   string (e.g. `145.0.7632.218`)
 - Writes Google Update policy keys to block any Omaha-based update
@@ -38,6 +46,15 @@ installer just rewraps it.
 - No code signing — the binary is unsigned, SmartScreen will warn on
   first run until an EV cert is procured. For SCCM-pushed installs in a
   trusted enterprise environment that is typically a tolerated state.
+
+## Caveat: the Chromium policy key is shared by every unbranded Chromium
+
+`HKLM\SOFTWARE\Policies\Chromium` is read by any *unbranded* Chromium
+build on the machine (real Google Chrome reads
+`Policies\Google\Chrome`, Edge reads `Policies\Microsoft\Edge`, so
+neither is affected). Guard workstations run no other unbranded
+Chromium, so this is moot for the fleet; drop `ChromiumPolicyComponent`
+from the `Feature` if that ever changes.
 
 ## Caveat: Google Update policy keys are system-wide
 
@@ -87,10 +104,17 @@ Test-Path "C:\Program Files\DeepSentinel\Live Viewer\chrome.exe"
 Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\* `
   | Where-Object DisplayName -eq "DeepSentinel Live Viewer"
 Get-ItemProperty HKLM:\SOFTWARE\Policies\Google\Update
+Get-ItemProperty HKLM:\SOFTWARE\Policies\Chromium      # HardwareAccelerationModeEnabled = 0
 Get-ItemProperty "HKLM:\SOFTWARE\DeepSentinel\Live Viewer"
 
-# Launch
-& "C:\Program Files\DeepSentinel\Live Viewer\live-viewer.bat"
+# Launch from the Start Menu shortcut (DeepSentinel > DeepSentinel Live
+# Viewer), then check the policy took effect:
+#   chrome://policy  -> HardwareAccelerationModeEnabled = false, Machine scope
+#   chrome://gpu     -> "Video Decode: Software only. Hardware acceleration disabled"
+#   Settings > System -> "Use graphics acceleration when available" is
+#                        off and greyed out ("managed by your organization")
+#   chrome://webrtc-internals during an H.265 live view
+#                    -> inbound-rtp decoderImplementation = "FFmpeg"
 
 # Uninstall
 msiexec /x "DeepSentinel-Live-Viewer-145.0.7632.218.msi" /qn /l*v uninstall.log
@@ -140,6 +164,14 @@ GPSI re-runs on next boot if the install is missing.
 Bumping versions: rebuild the portable zip with a newer Chromium →
 `build-msi.sh` reads `chromium-version.txt` and stamps the new
 `ProductVersion` automatically. Existing installs upgrade in place.
+
+Respinning the **same** Chromium version (as DS-2916 does — same
+145.0.7632.218 zip, installer-only change) also upgrades in place, but
+the `Version` registry value does not change. A detection rule that
+matches only on `Version` will treat the old install as already
+compliant and never push the respin; detect on the new artefact instead
+(e.g. `HKLM\SOFTWARE\Policies\Chromium\HardwareAccelerationModeEnabled`
+exists and equals `0`), or on the new MSI's `ProductCode`.
 
 ## Coexistence with real Google Chrome
 

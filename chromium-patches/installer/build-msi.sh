@@ -102,21 +102,11 @@ mv "$inner" "$STAGE"
 # Strip portable-zip-specific files: the portable chrome.bat uses a
 # profile dir next to the binary (wrong for an MSI-installed Program
 # Files location, which is read-only for normal users), and the
-# README/NOTICES describe the portable layout. We'll regenerate the
-# launcher and rely on installer/README.md for MSI-specific docs.
+# README/NOTICES describe the portable layout. The MSI's Start Menu
+# shortcut (see DeepSentinelLiveViewer.wxs) launches chrome.exe with the
+# per-user --user-data-dir and the other flags; installer/README.md has
+# the MSI-specific docs.
 rm -f "$STAGE/chrome.bat" "$STAGE/README.txt" "$STAGE/NOTICES.txt"
-
-# MSI launcher. Resolves %LOCALAPPDATA% at runtime so each user on a
-# per-machine install gets their own profile. --disable-component-update
-# kills the only remaining network path that might mutate the install.
-cat > "$STAGE/live-viewer.bat" <<'EOF'
-@echo off
-setlocal
-set "USER_DATA=%LOCALAPPDATA%\DeepSentinel\Live Viewer\User Data"
-if not exist "%USER_DATA%" mkdir "%USER_DATA%"
-start "" "%~dp0chrome.exe" --user-data-dir="%USER_DATA%" --no-default-browser-check --disable-component-update %*
-endlocal
-EOF
 
 echo "==> harvesting staged tree with heat.exe"
 "$HEAT" dir "$(cygpath -w "$STAGE")" \
@@ -144,8 +134,8 @@ echo "==> linking → $MSI_PATH"
 #        on a perMachine install (standard MSI shortcut idiom, safe to
 #        suppress).
 # ICE91: warns that shortcuts targeting non-advertised files may not
-#        self-heal — fine for our use case (the .bat is small and the
-#        chrome.exe behind it is the actual self-healing concern).
+#        self-heal — fine for our use case (MajorUpgrade re-lays the
+#        whole tree; nothing relies on per-file self-heal).
 # ICE61: warns that MajorUpgrade allows same-version upgrades, which
 #        is intentional (AllowSameVersionUpgrades="yes") so respins of
 #        the same Chromium build can reinstall cleanly during dev.
