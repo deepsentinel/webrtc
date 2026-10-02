@@ -4,8 +4,8 @@
 
   Build via chromium-patches/installer/build-msi.sh, which:
     1. Extracts the portable zip from package.sh into a staging dir
-    2. Writes live-viewer.bat into the stage so user-data-dir is
-       resolved at runtime (per-user profile on a per-machine install)
+    2. Strips the portable zip's chrome.bat / README / NOTICES (the
+       Start Menu shortcut below carries the launch flags itself)
     3. Runs heat.exe to harvest the stage into Harvested.wxs
     4. Runs candle.exe + light.exe against both .wxs files
 
@@ -75,9 +75,15 @@
       </Directory>
     </Directory>
 
-    <!-- Start Menu shortcut. Targets live-viewer.bat (not chrome.exe
-         directly) so %LOCALAPPDATA% expansion happens per-user at
-         launch time, which is what we want on a per-machine install. -->
+    <!-- Start Menu shortcut. Launches chrome.exe directly; the shell
+         expands %LOCALAPPDATA% in the arguments at launch time, so each
+         user of this per-machine install gets their own profile.
+         disable-component-update kills the only remaining network path
+         that might mutate the install. The two renderer-cancellation
+         features and disable-hang-monitor keep LSC's long-lived tabs
+         from being killed as "unresponsive" under a full 5x2 grid.
+         (Matches the MSI shipped to guards on 2026-05-14; the earlier
+         live-viewer.bat launcher is gone.) -->
     <DirectoryRef Id="AppStartMenuDir">
       <Component Id="StartMenuShortcutComponent"
                  Guid="A2B3C4D5-E6F7-4890-A1B2-C3D4E5F60718"
@@ -85,7 +91,8 @@
         <Shortcut Id="StartMenuShortcut"
                   Name="DeepSentinel Live Viewer"
                   Description="Internal Chromium build with software HEVC decode"
-                  Target="[INSTALLFOLDER]live-viewer.bat"
+                  Target="[INSTALLFOLDER]chrome.exe"
+                  Arguments="--user-data-dir=&quot;%LOCALAPPDATA%\DeepSentinel\Live Viewer\User Data&quot; --no-default-browser-check --disable-component-update --enable-features=SkipRendererCancellationThrottle,RendererCancellationThrottleImprovements --disable-hang-monitor"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="ChromeIcon.exe"
                   IconIndex="0" />
@@ -118,6 +125,23 @@
           <RegistryValue Name="AutoUpdateCheckPeriodMinutes" Type="integer" Value="0" />
         </RegistryKey>
       </Component>
+      <!-- DS-2916: force software decode. HardwareAccelerationModeEnabled=0
+           is the Chromium policy behind Settings > System > "Use graphics
+           acceleration when available". As a machine policy it (a) turns
+           the whole GPU path off, including D3D11 HEVC video decode, so
+           every H.265 stream goes through our FFmpeg SW decoder no matter
+           how chrome.exe is launched, and (b) greys the toggle out
+           in Settings so guards cannot flip it back. Our build is not
+           Google-branded, so it reads Software\Policies\Chromium, not
+           Software\Policies\Google\Chrome: real Chrome on the same host
+           is unaffected. -->
+      <Component Id="ChromiumPolicyComponent"
+                 Guid="D5E6F708-192A-4B3C-D4E5-F60718A2B3C4"
+                 Win64="yes">
+        <RegistryKey Root="HKLM" Key="Software\Policies\Chromium">
+          <RegistryValue Name="HardwareAccelerationModeEnabled" Type="integer" Value="0" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
       <Component Id="ProductIdentificationComponent"
                  Guid="C4D5E6F7-0819-4A2B-C3D4-E5F60718A2B3"
                  Win64="yes">
@@ -132,6 +156,7 @@
       <ComponentGroupRef Id="HarvestedFiles" />
       <ComponentRef Id="StartMenuShortcutComponent" />
       <ComponentRef Id="UpdatePoliciesComponent" />
+      <ComponentRef Id="ChromiumPolicyComponent" />
       <ComponentRef Id="ProductIdentificationComponent" />
     </Feature>
 
